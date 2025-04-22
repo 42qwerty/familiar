@@ -1,0 +1,207 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+		]
+	},
+	"buffers":
+	[
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/qwerty/familiar"
+	],
+	"file_history":
+	[
+		"/home/qwerty/familiar/actions/run_app_action.py",
+		"/home/qwerty/familiar/nlu_processor.py",
+		"/home/qwerty/familiar/utils.py",
+		"/home/qwerty/familiar/command_dispatcher.py",
+		"/home/qwerty/familiar/familiar.py",
+		"/home/qwerty/familiar/dispatcher.py",
+		"/home/qwerty/familiar/main.py",
+		"/home/qwerty/familiar/app_aliases.json",
+		"/home/qwerty/Desktop/dispatcher.txt",
+		"/home/qwerty/Desktop/app_aliases.txt",
+		"/home/qwerty/dispapp/dispatcher.py",
+		"/home/qwerty/Desktop/txt/old1",
+		"/home/qwerty/Desktop/jsonl/convert.py",
+		"/home/qwerty/Desktop/jsonl/1206.jsonl",
+		"/home/qwerty/Desktop/jsonl/gemini_8.jsonl",
+		"/home/qwerty/Desktop/jsonl/gemini_1.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_4.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_20.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_5.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_17.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_3.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_8.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_2_jsonl.txt",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_11.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_10.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_13.jsonl",
+		"/home/qwerty/Desktop/jsonl/gemini_10.jsonl",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_30.jsonl",
+		"/home/qwerty/Desktop/txt/gemini_10.txt",
+		"/home/qwerty/Downloads/Telegram Desktop/gemini_0 (3).txt",
+		"/home/qwerty/tiger_finetune/jsonl/gemini_23.jsonl",
+		"/home/qwerty/Desktop/snake_final_fixed_v2.html",
+		"/home/qwerty/Desktop/snake_final_corrected.html",
+		"/home/qwerty/Desktop/snake_final_fixed.html",
+		"/home/qwerty/Desktop/arkanoid.html",
+		"/home/qwerty/Desktop/borders.html",
+		"/home/qwerty/Desktop/snake.html"
+	],
+	"find":
+	{
+		"height": 38.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"scrollbar_highlights": true,
+		"show_context": true,
+		"use_buffer2": true,
+		"use_gitignore": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 26.0
+	},
+	"input":
+	{
+		"height": 0.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "familiar.sublime-project",
+	"replace":
+	{
+		"height": 48.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 150.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
