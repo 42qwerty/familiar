@@ -1,25 +1,24 @@
-# Исправленная версия файла: command_dispatcher.py
+# Финальная версия: command_dispatcher.py (Рабочая + Debug)
 # -*- coding: utf-8 -*-
 
-import shutil
-import time
-
-# Импортируем утилиты и обработчики интентов
 import utils
-from intent_handlers import handle_manage_app # Импортируем первый обработчик
-# TODO: Добавить импорты для handle_close_app, handle_add_alias и т.д.
+# Импортируем обработчики из папки intent_handlers
+from intent_handlers import handle_manage_app
+# TODO: Импортировать обработчики для close_app, add_alias и т.д., когда они будут готовы
+# from intent_handlers import handle_close_app # Пример - пока нет этого файла
+# from intent_handlers import handle_add_alias # Пример - пока нет этого файла
 
 # Глобальная переменная для алиасов
 APP_ALIASES = {}
 
 # Словарь маршрутизации интентов к функциям-обработчикам
 INTENT_HANDLERS = {
-    # Используем 'run_app' как ключ, как договорились
-    "run_app": handle_manage_app.handle,
-    # --- Заглушки для других интентов ---
-    # "close_app": handle_close_app.handle,
+    "manage_app": handle_manage_app.handle, # Связываем интент с функцией handle из нужного модуля
+    # TODO: Добавить другие интенты и их обработчики
+    # "close_app": handle_close_app.handle, # ОШИБКА: Не нужно, так как close - это action внутри manage_app
     # "add_alias": handle_add_alias.handle,
-    # ... и т.д. ...
+    # "manage_system": handle_manage_system.handle,
+    # ... и т.д.
 }
 
 def initialize_dispatcher():
@@ -31,15 +30,12 @@ def initialize_dispatcher():
     else:
         print("[DISPATCHER][WARN] Алиасы не загружены или файл пуст.")
 
-# --- Функция теперь снова принимает debug_mode ---
+# --- Функция СНОВА принимает debug_mode ---
 def dispatch_command(parsed_nlu, debug_mode=False):
     """
     Маршрутизирует команду к обработчику ИЛИ выводит NLU результат в дебаг-режиме.
     """
-    global APP_ALIASES
-
     if not parsed_nlu or "intent" not in parsed_nlu:
-        # Добавим префикс DEBUG/ERROR в зависимости от режима
         log_prefix = "[DISPATCHER_DEBUG]" if debug_mode else "[DISPATCHER][ERROR]"
         print(f"{log_prefix} Получены невалидные NLU данные.")
         return "Не удалось распознать команду."
@@ -53,11 +49,14 @@ def dispatch_command(parsed_nlu, debug_mode=False):
         print("="*20 + " DEBUG MODE " + "="*20)
         print(f"[DISPATCHER_DEBUG] Распознанный интент: {intent}")
         print(f"[DISPATCHER_DEBUG] Распознанные параметры: {parameters}")
-        # Нормализуем имя даже в дебаге, чтобы видеть, как оно будет передано
-        if intent in ["run_app", "close_app", "add_alias"] and "app_name" in parameters:
+        # Показываем нормализацию для релевантных интентов
+        if intent == "manage_app" and "app_name" in parameters:
              app_name_raw = parameters.get("app_name")
              canonical_name = APP_ALIASES.get(app_name_raw.lower(), app_name_raw.lower())
-             print(f"[DISPATCHER_DEBUG] Нормализованное имя (для справки): '{canonical_name}'")
+             print(f"[DISPATCHER_DEBUG] Нормализованное имя app_name (для справки): '{canonical_name}'")
+        elif intent == "add_alias" and "alias_name" in parameters:
+             alias_name = parameters.get("alias_name")
+             print(f"[DISPATCHER_DEBUG] Имя алиаса (для справки): '{alias_name.lower()}'")
         print("="*52)
         return f"ДЕБАГ: Распознано: интент='{intent}', параметры={parameters}"
     # --- КОНЕЦ РЕЖИМА ДЕБАГА ---
@@ -69,31 +68,9 @@ def dispatch_command(parsed_nlu, debug_mode=False):
 
         if handler_function:
             try:
-                # --- Логика вызова обработчиков ---
-                if intent == "run_app": # Ключ 'run_app'
-                     app_name_raw = parameters.get("app_name")
-                     if not app_name_raw: return "Не поняла, какое приложение нужно."
-                     # Нормализация имени ПЕРЕД вызовом обработчика
-                     canonical_name = APP_ALIASES.get(app_name_raw.lower(), app_name_raw.lower())
-                     # Вызываем обработчик с нормализованным именем
-                     return handler_function(canonical_name) # handle_manage_app ожидает canonical_name
-
-                # TODO: Добавить elif для close_app, add_alias и т.д., передавая нужные параметры
-                # elif intent == "close_app":
-                #    app_name_raw = parameters.get("app_name")
-                #    if not app_name_raw: return "Не поняла, какое приложение закрыть."
-                #    canonical_name = APP_ALIASES.get(app_name_raw.lower(), app_name_raw.lower())
-                #    return handler_function(canonical_name) # handle_close_app ожидает canonical_name
-                # elif intent == "add_alias":
-                #    alias_name = parameters.get("alias_name")
-                #    canonical_name_param = parameters.get("canonical_name")
-                #    if not alias_name or not canonical_name_param: return "Не поняла, какой алиас и для какого приложения добавить."
-                #    # Передаем оба параметра, обработчик сам обновит глобальные алиасы
-                #    return handler_function(alias_name, canonical_name_param)
-
-                else:
-                     # Для других интентов (когда они будут) передаем весь словарь параметров
-                     return handler_function(parameters) # Пример
+                # Вызываем найденный обработчик, передавая ему параметры и алиасы
+                # Обработчик сам разберется с параметрами (включая 'action')
+                return handler_function(parameters, APP_ALIASES) # Передаем параметры и алиасы
 
             except Exception as e:
                 print(f"[DISPATCHER][ERROR] Ошибка при выполнении обработчика для интента '{intent}': {e}")
@@ -103,11 +80,8 @@ def dispatch_command(parsed_nlu, debug_mode=False):
         else:
             # Обработчик не найден
             print(f"[DISPATCHER][WARN] Обработчик для интента '{intent}' не найден.")
-            unknown_handler = INTENT_HANDLERS.get("unknown")
-            if unknown_handler:
-                return unknown_handler(parameters)
-            else:
-                return "Извините, я пока не умею обрабатывать такую команду."
+            # Можно добавить обработку 'unknown' интента здесь, если нужно
+            return "Извините, я пока не умею обрабатывать такую команду."
 
 # --- Инициализация при импорте ---
 initialize_dispatcher()
