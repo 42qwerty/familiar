@@ -4,7 +4,8 @@
 import utils
 # Import handlers from the intent_handlers directory
 from intent_handlers import handle_manage_app
-from intent_handlers import handle_add_alias # <-- ADDED: Import the new handler
+from intent_handlers import handle_add_alias
+from intent_handlers import handle_manage_system
 # TODO: Import handlers for other intents when ready
 
 # Global variable for aliases (loaded on initialization)
@@ -13,7 +14,8 @@ APP_ALIASES = {}
 # Routing dictionary: maps intent strings to handler functions
 INTENT_HANDLERS = {
     "manage_app": handle_manage_app.handle,
-    "add_alias": handle_add_alias.handle, # <-- ADDED: Route 'add_alias' intent
+    "add_alias": handle_add_alias.handle,
+    "manage_system": handle_manage_system.handle,
     # TODO: Add other intents and their handlers
     # "manage_system": handle_manage_system.handle,
     # ... etc.
