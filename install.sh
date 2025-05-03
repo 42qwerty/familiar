@@ -92,7 +92,7 @@ EnvironmentFile=${ENV_FILE}
 # Ensure DISPLAY and XAUTHORITY are passed if needed for GUI interactions
 # These should be set by the user's session startup script (update_familiar_env.sh)
 # and read via EnvironmentFile
-ExecStart=${PYTHON_PATH} ${PROJECT_DIR}/telegram_bot.py
+ExecStart=${PYTHON_PATH} -u ${PROJECT_DIR}/telegram_bot.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
