@@ -1,16 +1,15 @@
+# File: telegram_bot.py
 # -*- coding: utf-8 -*-
 import logging
-import os # Для чтения токена из переменной окружения
+import os
 
-# Импортируем наши модули Фамильяра
-import nlu_processor
-import command_dispatcher
+# --- ИМПОРТИРУЕМ НОВОЕ ЯДРО ФАМИЛЬЯРА ---
+import familiar # Наш новый основной модуль с process_text_command
 
-# Импортируем необходимые классы из библиотеки python-telegram-bot
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Настройка логирования (полезно для отладки)
+# Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -18,13 +17,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- КОНФИГУРАЦИЯ ---
-# Получаем токен из переменной окружения (более безопасно)
-# Перед запуском установи переменную окружения: export TELEGRAM_BOT_TOKEN='ВАШ_ТОКЕН'
-# Или просто вставь токен сюда для теста: TELEGRAM_BOT_TOKEN = 'ВАШ_СУПЕР_СЕКРЕТНЫЙ_ТОКЕН'
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 if not TELEGRAM_BOT_TOKEN:
     logger.error("Токен Telegram бота не найден! Установите переменную окружения TELEGRAM_BOT_TOKEN.")
-    exit() # Выход, если токен не найден
+    exit()
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
 
@@ -40,61 +36,47 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("Просто отправьте мне команду текстом, например: 'открой браузер' или 'закрой telegram'.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обрабатывает текстовые сообщения пользователя как команды для Фамильяра."""
+    """Обрабатывает текстовые сообщения пользователя, передавая их ядру Фамильяра."""
     command_text = update.message.text
-    user_id = update.effective_user.id # Можно использовать для разграничения доступа в будущем
+    user_id = update.effective_user.id
     logger.info(f"Получена команда от пользователя {user_id}: '{command_text}'")
 
-    await update.message.reply_text(f"Получил команду: '{command_text}'. Обрабатываю...")
+    # Отправляем предварительное сообщение (можно оставить или убрать)
+    # await update.message.reply_text(f"Получил команду: '{command_text}'. Обрабатываю...")
 
-    # 1. Получаем NLU ответ от Ollama
-    logger.info("Обработка NLU...")
-    nlu_response_text = nlu_processor.get_nlu_from_ollama(command_text)
-
-    if not nlu_response_text:
-        logger.warning("Не получен ответ от NLU процессора.")
-        await update.message.reply_text("Не удалось связаться с NLU процессором.")
-        return
-
-    # 2. Извлекаем JSON из ответа NLU
-    logger.info("Извлечение JSON из ответа NLU...")
-    parsed_nlu = nlu_processor.extract_json_from_response(nlu_response_text)
-
-    if not parsed_nlu:
-        logger.warning("Не удалось извлечь JSON из ответа NLU.")
-        # Отправляем сырой ответ NLU пользователю для отладки (можно убрать потом)
-        await update.message.reply_text(f"Не удалось разобрать ответ NLU. Ответ был:\n```\n{nlu_response_text}\n```")
-        return
-
-    # 3. Передаем команду в диспетчер Фамильяра (в рабочем режиме!)
-    logger.info(f"Передача в диспетчер: {parsed_nlu}")
     try:
-        # Вызываем диспетчер из нашего модуля command_dispatcher
-        # Передаем False для debug_mode, так как это рабочий режим бота
-        dispatcher_result = command_dispatcher.dispatch_command(parsed_nlu, debug_mode=False)
-        logger.info(f"Результат диспетчера: {dispatcher_result}")
-        # Отправляем результат пользователю
-        await update.message.reply_text(str(dispatcher_result)) # Преобразуем результат в строку на всякий случай
+        # --- ИСПОЛЬЗУЕМ НОВОЕ ЯДРО ДЛЯ ОБРАБОТКИ КОМАНДЫ ---
+        # familiar.process_text_command теперь делает всю работу:
+        # 1. NLU для извлечения интента
+        # 2. Диспетчеризация и выполнение команды (которая вернет структурированный результат)
+        # 3. Генерация естественного ответа на основе структурированного результата
+        final_response_text = familiar.process_text_command(command_text)
+        # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+        logger.info(f"Финальный ответ для пользователя: {final_response_text}")
+        await update.message.reply_text(final_response_text)
+
     except Exception as e:
-        logger.error(f"Ошибка при вызове диспетчера: {e}", exc_info=True)
-        await update.message.reply_text(f"Произошла внутренняя ошибка при обработке команды: {e}")
+        logger.error(f"Ошибка при вызове familiar.process_text_command: {e}", exc_info=True)
+        # В случае серьезной ошибки в ядре, отправляем общее сообщение
+        await update.message.reply_text(f"Произошла неожиданная внутренняя ошибка при обработке вашей команды: {e}")
 
 
 # --- ОСНОВНАЯ ФУНКЦИЯ ЗАПУСКА БОТА ---
 
 def main() -> None:
     """Запускает Telegram бота."""
-    # Создаем приложение и передаем ему токен бота.
+    # Инициализация диспетчера и других компонентов ядра происходит при импорте
+    # familiar.py и command_dispatcher.py
+    logger.info("Инициализация ядра Фамильяра (диспетчер и т.д.)...")
+    # command_dispatcher.initialize_dispatcher() # Вызывается при импорте command_dispatcher
+
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-
-    # Регистрируем обработчик для всех текстовых сообщений (кроме команд)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Запускаем бота (он будет работать, пока вы не остановите процесс)
     logger.info("Запуск Telegram бота...")
     application.run_polling()
 

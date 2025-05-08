@@ -6,15 +6,16 @@ import requests
 import os
 
 # --- Constants (Can be moved to config later) ---
-# Use environment variable for URL if available, otherwise default
-DEFAULT_API_URL = 'http://localhost:11434/api/generate'
-API_URL = os.environ.get('OLLAMA_API_URL', DEFAULT_API_URL)
-DEFAULT_MODEL_NAME = "mistral" # Default model
+DEFAULT_API_URL = os.environ.get('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
+DEFAULT_MODEL_NAME = "mistral" # Default model for all LLM calls
+DEFAULT_TIMEOUT = 90 # Default timeout for API requests
 
-# --- MODIFIED NLU INSTRUCTION TEMPLATE (v5) ---
-# Changed 'add_alias' parameters from alias_name/canonical_name to entity1/entity2
-
+# --- NLU INSTRUCTION TEMPLATE (v8 - из предыдущих шагов) ---
+# (Этот шаблон остается здесь, так как он нужен для get_nlu_intent_from_text)
 NLU_INSTRUCTION_TEMPLATE = """Тебе будет предоставлена пользовательская команда. Твоя задача - извлечь из нее основное намерение (intent) и параметры (parameters), включая конкретное действие (action), если оно применимо, и вернуть результат ТОЛЬКО в виде чистого JSON объекта.
+
+**Важно: при извлечении параметров `entity1` и `entity2` для интента `add_alias`, не включай в них глаголы действия (например, 'сохрани', 'свяжи', 'запомни') или лишние уточняющие слова ('себе', 'у', 'это', 'будет'). Извлекай только сами имена или псевдонимы.**
+Извлеки **псевдоним (обычно короткое имя X)** и **каноническое имя команды (обычно Y)** из фраз, устанавливающих связь, например: "X это Y", "свяжи X и Y", "пусть X будет Y", "запомни X как Y". Важно: не включай сами глаголы 'свяжи', 'запомни' или слова 'это', 'пусть', 'будет', 'себе', 'у себя' и т.д.)
 
 Возможные намерения (intent) и действия (action):
 
@@ -24,8 +25,9 @@ NLU_INSTRUCTION_TEMPLATE = """Тебе будет предоставлена п�
     * Обязательный параметр: "app_name".
 * intent: manage_system
     * action: "reboot" (Перезагрузить)
-    * action: "update" (Обновить)
+    * action: "update" (Обновить систему - запуск apt update && apt upgrade -y && apt dist-upgrade -y)
     * action: "shutdown" (Выключить)
+    * action: "uptime" (Показать время работы системы)
     * Параметры не требуются.
 * intent: manage_sound
     * action: "up" (Громче)
@@ -34,7 +36,7 @@ NLU_INSTRUCTION_TEMPLATE = """Тебе будет предоставлена п�
     * action: "unmute" (Включить звук)
     * Опциональный параметр: "amount".
 * intent: add_alias
-    * Параметры: "entity1", "entity2". (Извлеки две сопоставляемые сущности из строки вида: "сохрани у себя entity1 это entity2" или "свяжи X и Y", "пусть A будет B", "запомни C как D". Важно: не включай сами глаголы 'свяжи', 'запомни' или слова 'это', 'пусть', 'будет', 'себе', 'у себя' и т.д.)
+    * Параметры: "entity1", "entity2".
 * intent: ask_time
     * Параметров нет.
 * intent: web_search
@@ -60,17 +62,9 @@ NLU_INSTRUCTION_TEMPLATE = """Тебе будет предоставлена п�
 Результат:
 {{"intent": "manage_app", "parameters": {{"action": "close", "app_name": "Chrome"}}}}
 
-Команда: убей процесс телеграм
+Команда: убей процесс firefox
 Результат:
 {{"intent": "manage_app", "parameters": {{"action": "close", "app_name": "Firefox"}}}}
-
-Команда: запомни тг это telegram
-Результат:
-{{"intent": "add_alias", "parameters": {{"entity1": "тг", "entity2": "telegram"}}}}
-
-Команда: свяжи браузер и google-chrome
-Результат:
-{{"intent": "add_alias", "parameters": {{"entity1": "браузер", "entity2": "google-chrome"}}}}
 
 Команда: запомни тг это telegram
 Результат:
@@ -156,96 +150,113 @@ NLU_INSTRUCTION_TEMPLATE = """Тебе будет предоставлена п�
 Результат:
 """
 
-# --- Functions ---
-
-def get_nlu_from_ollama(user_command,
-                        instruction_template=NLU_INSTRUCTION_TEMPLATE,
-                        api_url=API_URL,
-                        model_name=DEFAULT_MODEL_NAME,
-                        timeout=90):
-    """Sends the command to the Ollama API and returns the raw text response."""
+# --- Вспомогательная функция для вызова LLM ---
+def _call_ollama_api(full_prompt_text: str,
+                     model_name: str = DEFAULT_MODEL_NAME,
+                     api_url: str = DEFAULT_API_URL,
+                     timeout: int = DEFAULT_TIMEOUT) -> str | None:
+    """
+    Внутренняя функция для отправки запроса к Ollama API.
+    Принимает уже полностью сформированный текст инструкции (prompt).
+    Возвращает текстовый ответ от модели или None в случае ошибки.
+    """
     if not api_url:
-        print("Error: Ollama API URL is not set (check OLLAMA_API_URL or DEFAULT_API_URL constant).")
+        print("[NLU_PROCESSOR][ERROR] Ollama API URL is not set.")
         return None
 
-    # Format the full prompt for the model
-    full_instruction = instruction_template.format(user_command=user_command)
-
-    # Parameters for the Ollama API request
     payload = {
         "model": model_name,
-        "prompt": full_instruction,
-        "stream": False, # Get the full response at once
+        "prompt": full_prompt_text,
+        "stream": False,
         "options": {
-            "temperature": 0.3, # Low temperature for more predictable JSON
+            "temperature": 0.3, # Низкая температура для NLU и более предсказуемых ответов
             "repeat_penalty": 1.15,
-            "num_predict": 150 # Limit response length (adjust as needed)
+            "num_predict": 200 # Лимит длины ответа (можно настроить)
         }
-        # Removed "raw": True - Ollama will handle model's system prompt if it exists
     }
 
     print(f"[NLU_PROCESSOR][DEBUG] Sending request to {api_url} for model '{model_name}'...")
-    # print(f"[NLU_PROCESSOR][DEBUG] Payload: {payload}") # Uncomment for detailed debugging
+    # print(f"[NLU_PROCESSOR][DEBUG] Payload prompt (first 100 chars): {full_prompt_text[:100]}...") # Для отладки
 
     try:
         response = requests.post(api_url, json=payload, timeout=timeout)
-        response.raise_for_status() # Check for HTTP errors (4xx, 5xx)
-
+        response.raise_for_status()
         data = response.json()
 
         if 'response' in data:
-            result_text = data['response']
+            result_text = data['response'].strip()
             print(f"[NLU_PROCESSOR][DEBUG] Raw response from model: '{result_text}'")
-            return result_text.strip()
+            return result_text
         else:
-            print(f"[NLU_PROCESSOR][ERROR] 'response' field not found in API response.")
-            print(f"[NLU_PROCESSOR][DEBUG] Full response: {data}")
-            return "" # Return empty string on response structure error
-
+            print(f"[NLU_PROCESSOR][ERROR] 'response' field not found in API response. Full response: {data}")
+            return None
     except requests.exceptions.Timeout:
-        print(f"Network Error: Timeout exceeded ({timeout} sec) while requesting {api_url}")
+        print(f"[NLU_PROCESSOR][ERROR] Network Error: Timeout ({timeout}s) for {api_url}")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"Network Error during Ollama API request: {e}")
+        print(f"[NLU_PROCESSOR][ERROR] Network Error during Ollama API request: {e}")
         return None
     except json.JSONDecodeError:
-        print(f"Error: Ollama API response is not valid JSON.")
-        print(f"Status Code: {response.status_code}")
-        print(f"Response start: {response.text[:200]}...")
+        print(f"[NLU_PROCESSOR][ERROR] Ollama API response is not valid JSON. Status: {response.status_code}, Text: {response.text[:200]}...")
         return None
     except Exception as e:
-        print(f"Unknown error during Ollama API call: {e}")
+        print(f"[NLU_PROCESSOR][ERROR] Unknown error during Ollama API call: {e}")
         return None
 
+# --- Функция для извлечения NLU (интент + параметры) ---
+def get_nlu_intent_from_text(user_command: str,
+                             model_name: str = DEFAULT_MODEL_NAME,
+                             api_url: str = DEFAULT_API_URL,
+                             timeout: int = DEFAULT_TIMEOUT) -> str | None:
+    """
+    Отправляет команду пользователя и NLU_INSTRUCTION_TEMPLATE в LLM для извлечения интента.
+    Возвращает сырой текстовый ответ от модели (ожидается JSON).
+    """
+    if not user_command:
+        print("[NLU_PROCESSOR][WARN] Empty user command received for NLU.")
+        return None
 
-def extract_json_from_response(response_text):
-    """Extracts the first valid JSON object from the NLU response string."""
+    full_nlu_prompt = NLU_INSTRUCTION_TEMPLATE.format(user_command=user_command)
+    return _call_ollama_api(full_nlu_prompt, model_name, api_url, timeout)
+
+# --- НОВАЯ ФУНКЦИЯ: Для генерации ответа LLM на основе готовой инструкции ---
+def generate_llm_response_from_template(full_prompt_text: str,
+                                        model_name: str = DEFAULT_MODEL_NAME,
+                                        api_url: str = DEFAULT_API_URL,
+                                        timeout: int = DEFAULT_TIMEOUT) -> str | None:
+    """
+    Отправляет уже полностью сформированный текст инструкции (prompt) в LLM.
+    Используется для генерации ответов, когда инструкция формируется в другом месте (например, в familiar.py).
+    Возвращает текстовый ответ от модели.
+    """
+    if not full_prompt_text:
+        print("[NLU_PROCESSOR][WARN] Empty prompt text received for LLM response generation.")
+        return None
+    return _call_ollama_api(full_prompt_text, model_name, api_url, timeout)
+
+# --- Функция для извлечения JSON из ответа NLU ---
+def extract_json_from_response(response_text: str | None) -> dict | None:
+    """Извлекает первый валидный JSON объект из строки ответа NLU."""
     if not response_text:
         return None
 
-    # Trim whitespace and potential artifacts before/after JSON
     text_to_parse = response_text.strip()
-
-    # Find the start and end of the first JSON object
     start_index = text_to_parse.find('{')
     end_index = text_to_parse.rfind('}')
 
     if start_index != -1 and end_index != -1 and end_index > start_index:
         json_str = text_to_parse[start_index:end_index + 1]
-        print(f"[NLU_PROCESSOR][DEBUG] Attempting to parse JSON: {json_str}")
+        # print(f"[NLU_PROCESSOR][DEBUG] Attempting to parse JSON: {json_str}") # Можно раскомментировать для детальной отладки
         try:
             parsed_json = json.loads(json_str)
-            # Simple check for expected structure (presence of 'intent')
-            if "intent" in parsed_json:
+            if "intent" in parsed_json or "status" in parsed_json: # Проверяем наличие ключевых полей
                  print(f"[NLU_PROCESSOR][DEBUG] JSON parsed successfully.")
                  return parsed_json
             else:
-                 print(f"[NLU_PROCESSOR][WARN] Parsed JSON missing 'intent' key: {parsed_json}")
-                 return None # Consider invalid if no intent
+                 print(f"[NLU_PROCESSOR][WARN] Parsed JSON missing 'intent' or 'status' key: {parsed_json}")
+                 return None
         except json.JSONDecodeError:
             print(f"[NLU_PROCESSOR][ERROR] Failed to parse JSON string: {json_str}")
-            # Could try more lenient parsing if model often adds text after JSON,
-            # but keeping it strict for now.
             return None
         except Exception as e:
              print(f"[NLU_PROCESSOR][ERROR] Unknown error during JSON parsing: {e}")
@@ -254,3 +265,6 @@ def extract_json_from_response(response_text):
         print(f"[NLU_PROCESSOR][WARN] Could not find a valid JSON object in the string: '{text_to_parse}'")
         return None
 
+# --- Старая функция get_nlu_from_ollama теперь переименована в get_nlu_intent_from_text ---
+# Для обратной совместимости, если где-то еще используется старое имя, можно добавить алиас:
+# get_nlu_from_ollama = get_nlu_intent_from_text
